@@ -1,5 +1,4 @@
 #include "MandelbrotUtils.hpp"
-#include "MandebrotPoint.hpp"
 #include "Config.hpp"
 #include "Logger.hpp"
 
@@ -9,6 +8,7 @@
 #include <thread>
 #include <array>
 #include <functional>
+#include <mutex>
 
 namespace Mandelbrot
 {
@@ -36,10 +36,22 @@ namespace Mandelbrot
 		
 		static inline std::size_t MaxIterations = 1000;
 
-		static inline sf::Vertex MandelbrotVertices[MandelbrotInternalData::MandelbrotArraySize];
-		static inline sf::VertexBuffer MandelbrotBuffer = sf::VertexBuffer(sf::PrimitiveType::Points, sf::VertexBuffer::Usage::Stream);
+		struct MandelbrotVertexBuffer
+		{
+			sf::Vertex MandelbrotVertices[MandelbrotInternalData::MandelbrotArraySize];
+			sf::VertexBuffer MandelbrotBuffer = sf::VertexBuffer(sf::PrimitiveType::Points, sf::VertexBuffer::Usage::Stream);
+		};
 
-		static inline sf::Sprite MandelbrotSprite = sf::Sprite();
+		struct MandelbrotSprite
+		{
+			sf::Sprite MdSprite;
+			sf::Texture MdTexture;
+			sf::Image MdImage;
+		};
+
+		// Mandelbrot Set Storages
+		static inline MandelbrotVertexBuffer MdVertexBuffer;
+		static inline MandelbrotSprite MdSprite;
 
 		// Pointer to the draw function.
 		static inline std::function<void(sf::RenderWindow&)> DrawFncPtr;
@@ -54,6 +66,9 @@ namespace Mandelbrot
 
 		// Data of the plane. See `MandelbrotData`.
 		static inline MandelbrotPlaneData PlaneData;
+
+		// Mutex used on Multi-threaded functions
+		static inline std::mutex Mutex = std::mutex();
 	};
 
 	void DrawVertexBuffer(sf::RenderWindow& renderer);
@@ -77,9 +92,11 @@ namespace Mandelbrot
 			for (std::size_t x = 0; x < Config::WINDOW_WIDTH; x++)
 			{
 				std::size_t j = (y * Config::WINDOW_WIDTH) + x;
-				MandelbrotInternalData::MandelbrotVertices[j].position = { static_cast<float>(x), static_cast<float>(y) };
+				MandelbrotInternalData::MdVertexBuffer.MandelbrotVertices[j].position = { static_cast<float>(x), static_cast<float>(y) };
 			}
 		}
+
+		MandelbrotInternalData::MdSprite.MdImage.create(Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT);
 
 		// Initializing function pointers
 		if (MandelbrotInternalData::UsingVertexBuffer)
@@ -95,8 +112,8 @@ namespace Mandelbrot
 			MandelbrotInternalData::DrawFncPtr = std::bind(Mandelbrot::DrawSprite, std::placeholders::_1);
 		}
 
-		MandelbrotInternalData::MandelbrotBuffer.create(MandelbrotInternalData::MandelbrotArraySize);
-		MandelbrotInternalData::MandelbrotBuffer.update(MandelbrotInternalData::MandelbrotVertices);
+		MandelbrotInternalData::MdVertexBuffer.MandelbrotBuffer.create(MandelbrotInternalData::MandelbrotArraySize);
+		MandelbrotInternalData::MdVertexBuffer.MandelbrotBuffer.update(MandelbrotInternalData::MdVertexBuffer.MandelbrotVertices);
 
 		Logger::GetLogger()->info("Mandelbrot Set Data Initialized.");
 		Logger::GetLogger()->info("\t=> Available Threads: {}", MandelbrotInternalData::ThreadCounter);
@@ -104,11 +121,6 @@ namespace Mandelbrot
 
 	void ProcessStUsingSprite(const MandelbrotProcessData& data)
 	{
-		sf::Texture md_texture = sf::Texture();
-		sf::Image md_image = sf::Image();
-
-		md_image.create(Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT);
-		
 		for (std::size_t y = 0; y < Config::WINDOW_HEIGHT; y++)
 		{
 			for (std::size_t x = 0; x < Config::WINDOW_WIDTH; x++)
@@ -120,12 +132,16 @@ namespace Mandelbrot
 					{ static_cast<double>(x), static_cast<double>(y) },
 					MandelbrotInternalData::PlaneData
 				);
-				md_image.setPixel(static_cast<unsigned int>(x), static_cast<unsigned int>(y), GetPointColor(GetPointIterations(plane_coords)));
+				MandelbrotInternalData::MdSprite.MdImage.setPixel(
+					static_cast<unsigned int>(x),
+					static_cast<unsigned int>(y),
+					GetPointColor(GetPointIterations(plane_coords))
+				);
 			}
 		}
 
-		md_texture.loadFromImage(md_image);
-		MandelbrotInternalData::MandelbrotSprite.setTexture(md_texture);
+		MandelbrotInternalData::MdSprite.MdTexture.loadFromImage(MandelbrotInternalData::MdSprite.MdImage);
+		MandelbrotInternalData::MdSprite.MdSprite.setTexture(MandelbrotInternalData::MdSprite.MdTexture);
 	}
 
 	void ProcessStUsingVertexBuffer(const MandelbrotProcessData& data)
@@ -142,21 +158,17 @@ namespace Mandelbrot
 					MandelbrotInternalData::PlaneData
 				);
 
-				MandelbrotInternalData::MandelbrotVertices[j].color = GetPointColor(GetPointIterations(plane_coords));
+				MandelbrotInternalData::MdVertexBuffer.MandelbrotVertices[j].color = GetPointColor(GetPointIterations(plane_coords));
 			}
 		}
-		MandelbrotInternalData::MandelbrotBuffer.update(MandelbrotInternalData::MandelbrotVertices);
+		MandelbrotInternalData::MdVertexBuffer.MandelbrotBuffer.update(MandelbrotInternalData::MdVertexBuffer.MandelbrotVertices);
 	}
 
 	// Process Mandelbrot points in Single-threaded Mode
 	void ProcessSt()
 	{
-		MandelbrotProcessData data;
-		//data.MinX = 0;
-		//data.MaxX = Config::WINDOW_WIDTH;
-		//data.MinY = 0;
-		//data.MaxY = Config::WINDOW_HEIGHT;
-		//data.Data = MandelbrotInternalData::PlaneData;
+		// No need to initialize `data` correctly as it won't be used by the process function.
+		MandelbrotProcessData data{ 0 };
 		MandelbrotInternalData::ProcessFncPtrSt(data);
 	}
 
@@ -173,17 +185,15 @@ namespace Mandelbrot
 				);
 
 				// Should we use `std::lock_guard<std::mutex> mutex`?
-				MandelbrotInternalData::MandelbrotVertices[j].color = GetPointColor(GetPointIterations(plane_coords));
+				std::lock_guard<std::mutex> mutex(MandelbrotInternalData::Mutex);
+				MandelbrotInternalData::MdVertexBuffer.MandelbrotVertices[j].color = GetPointColor(GetPointIterations(plane_coords));
 			}
 		}
 
 		// Should we use `std::lock_guard<std::mutex> mutex`?
-		MandelbrotInternalData::MandelbrotBuffer.update(MandelbrotInternalData::MandelbrotVertices);
+		std::lock_guard<std::mutex> mutex(MandelbrotInternalData::Mutex);
+		MandelbrotInternalData::MdVertexBuffer.MandelbrotBuffer.update(MandelbrotInternalData::MdVertexBuffer.MandelbrotVertices);
 	}
-
-	// Leave it here for now.
-	// This must not be removed until another solution is found.
-	static sf::Image MtProcessImage;
 
 	void ProcessMtUsingSprite(const MandelbrotProcessData& data)
 	{
@@ -199,7 +209,12 @@ namespace Mandelbrot
 					data.Data
 				);
 				// Should we use `std::lock_guard<std::mutex> mutex`?
-				MtProcessImage.setPixel(static_cast<unsigned int>(x), static_cast<unsigned int>(y), GetPointColor(GetPointIterations(plane_coords)));
+				std::lock_guard<std::mutex> mutex(MandelbrotInternalData::Mutex);
+				MandelbrotInternalData::MdSprite.MdImage.setPixel(
+					static_cast<unsigned int>(x),
+					static_cast<unsigned int>(y),
+					GetPointColor(GetPointIterations(plane_coords))
+				);
 			}
 		}
 	}
@@ -207,11 +222,6 @@ namespace Mandelbrot
 	// Process Mandelbrot points in Multi-threaded Mode
 	void ProcessMt()
 	{
-		if (!MandelbrotInternalData::UsingVertexBuffer)
-		{
-			MtProcessImage.create(Config::WINDOW_WIDTH, Config::WINDOW_HEIGHT);
-		}
-
 		const std::size_t work_on_x_axis = (Config::WINDOW_WIDTH / MandelbrotInternalData::ThreadCounter);
 		const std::size_t work_on_y_axis = (Config::WINDOW_HEIGHT / MandelbrotInternalData::ThreadCounter);
 
@@ -234,6 +244,8 @@ namespace Mandelbrot
 				data.MinY = min_y;
 				data.MaxY = max_y;
 
+				Logger::GetLogger()->trace("TID=[{}] - min_x={} - max_x={} - min_y={} - max_y={}", tid, data.MinX, data.MaxX, data.MinY, data.MaxY);
+
 				// Pushing the new thread to the vector
 				threads.push_back( std::thread( MandelbrotInternalData::ProcessFncPtrMt, data) );
 				// Updating the workload of the next thread.
@@ -252,14 +264,6 @@ namespace Mandelbrot
 		for (auto& t : threads)
 		{
 			t.join();
-		}
-
-		// Update sprite only if we're now using VertexBuffer.
-		if (!MandelbrotInternalData::UsingVertexBuffer)
-		{
-			sf::Texture md_texture = sf::Texture();
-			md_texture.loadFromImage(MtProcessImage);
-			MandelbrotInternalData::MandelbrotSprite.setTexture(md_texture);
 		}
 	}
 	
@@ -361,14 +365,7 @@ namespace Mandelbrot
 			MandelbrotInternalData::DrawFncPtr = std::bind(Mandelbrot::DrawVertexBuffer, std::placeholders::_1);
 		}
 		// Use Sprite
-		else if(enable && !sf::VertexBuffer::isAvailable())
-		{
-			MandelbrotInternalData::ProcessFncPtrSt = std::bind(Mandelbrot::ProcessStUsingSprite, std::placeholders::_1);
-			MandelbrotInternalData::ProcessFncPtrMt = std::bind(Mandelbrot::ProcessMtUsingSprite, std::placeholders::_1);
-			MandelbrotInternalData::DrawFncPtr = std::bind(Mandelbrot::DrawSprite, std::placeholders::_1);
-		}
-		// Use Sprite
-		else
+		else if(enable && !sf::VertexBuffer::isAvailable() || !enable)
 		{
 			MandelbrotInternalData::ProcessFncPtrSt = std::bind(Mandelbrot::ProcessStUsingSprite, std::placeholders::_1);
 			MandelbrotInternalData::ProcessFncPtrMt = std::bind(Mandelbrot::ProcessMtUsingSprite, std::placeholders::_1);
@@ -383,12 +380,18 @@ namespace Mandelbrot
 
 	void DrawVertexBuffer(sf::RenderWindow& renderer)
 	{
-		renderer.draw(MandelbrotInternalData::MandelbrotBuffer);
+		renderer.draw(MandelbrotInternalData::MdVertexBuffer.MandelbrotBuffer);
 	}
 	
 	void DrawSprite(sf::RenderWindow& renderer)
 	{
-		renderer.draw(MandelbrotInternalData::MandelbrotSprite);
+		// Sprite must be updated here, otherwise, a black image would be drawn to the screen.
+		// I don't what causes that. Probably is related to the fact the one or more thread exists
+		// before others and the texture and sprite are updated before every thread being done.
+		// The `std::lock_guard` isn't needed also. The resource(sprite, texture and image) could be free at any time in the process thread.
+		MandelbrotInternalData::MdSprite.MdTexture.loadFromImage(MandelbrotInternalData::MdSprite.MdImage);
+		MandelbrotInternalData::MdSprite.MdSprite.setTexture(MandelbrotInternalData::MdSprite.MdTexture);
+		renderer.draw(MandelbrotInternalData::MdSprite.MdSprite);
 	}
 
 	void SetZoom(const double& zoom)

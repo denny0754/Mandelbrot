@@ -1,7 +1,6 @@
 #include <iostream>
 #include "Config.hpp"
 #include "MandelbrotUtils.hpp"
-#include "MandebrotPoint.hpp"
 #include "Logger.hpp"
 
 #include <SFML/Graphics.hpp>
@@ -20,7 +19,7 @@ int main()
 	Mandelbrot::SetOffset({ offsetX, offsetY });
 	Mandelbrot::UseVertexBuffer(true); // TODO Using the Sprite crashes the application. Probably caused by the multi-threaded function. TOFIX<->IMPORTANT
 	Mandelbrot::SetMaxIterations(1000u);
-	Mandelbrot::ProcessSt();
+	Mandelbrot::ProcessMt();
 
 	sf::ContextSettings settings;
 	settings.antialiasingLevel = 16;
@@ -47,9 +46,7 @@ int main()
 		}
 
 		window.clear();
-		
 		Mandelbrot::DrawMandelbrotSet(window);
-
 		window.display();
 	}
 

@@ -46,10 +46,8 @@ namespace Mandelbrot
 	sf::Vector2d GetOffset();
 
 	// Updates the plane(vertex buffer or sprite) only if something has changed.
-	// TODO To implement
 	void Update();
 	// Updates the plane(vertex buffer or sprite).
-	// TODO To implement
 	void ForceUpdate();
 }
 

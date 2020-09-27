@@ -143,7 +143,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
-      <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
       <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
       <TreatWarningAsError>true</TreatWarningAsError>
     </ClCompile>
@@ -160,10 +160,12 @@
     <ClCompile Include="source\Mandelbrot\MandelbrotUtils.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="source\Mandelbrot\Button.hpp" />
     <ClInclude Include="source\Mandelbrot\Config.hpp" />
     <ClInclude Include="source\Mandelbrot\Logger.hpp" />
     <ClInclude Include="source\Mandelbrot\MandebrotPoint.hpp" />
     <ClInclude Include="source\Mandelbrot\MandelbrotUtils.hpp" />
+    <ClInclude Include="source\Mandelbrot\Timer.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

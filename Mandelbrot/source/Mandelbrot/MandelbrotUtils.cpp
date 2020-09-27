@@ -69,6 +69,8 @@ namespace Mandelbrot
 		static inline MandelbrotPlaneData PreviousPlaneData = MandelbrotPlaneData();
 		static inline bool StateChanged = false;
 
+		static inline std::unordered_map<std::size_t, sf::Color> MandelbrotSetColors = {};
+
 		// Mutex used on Multi-threaded functions
 		static inline std::mutex Mutex = std::mutex();
 	};
@@ -119,6 +121,12 @@ namespace Mandelbrot
 
 		Logger::GetLogger()->info("Mandelbrot Set Data Initialized.");
 		Logger::GetLogger()->info("\t=> Available Threads: {}", MandelbrotInternalData::ThreadCounter);
+
+		for (std::size_t iter = 0; iter < 128; iter++)
+		{
+			MandelbrotInternalData::MandelbrotSetColors[iter] = GetPointColor(iter);
+		}
+		MandelbrotInternalData::MandelbrotSetColors[MandelbrotInternalData::MaxIterations] = sf::Color::Black;
 	}
 
 	void ProcessStUsingSprite(const MandelbrotProcessData& data)
@@ -160,7 +168,7 @@ namespace Mandelbrot
 					MandelbrotInternalData::PlaneData
 				);
 
-				MandelbrotInternalData::MdVertexBuffer.MandelbrotVertices[j].color = GetPointColor(GetPointIterations(plane_coords));
+				MandelbrotInternalData::MdVertexBuffer.MandelbrotVertices[j].color = MandelbrotInternalData::MandelbrotSetColors[GetPointIterations(plane_coords)];
 			}
 		}
 		MandelbrotInternalData::MdVertexBuffer.MandelbrotBuffer.update(MandelbrotInternalData::MdVertexBuffer.MandelbrotVertices);
@@ -299,6 +307,7 @@ namespace Mandelbrot
 	void SetMaxIterations(std::size_t iter)
 	{
 		MandelbrotInternalData::MaxIterations = iter;
+		MandelbrotInternalData::MandelbrotSetColors[MandelbrotInternalData::MaxIterations] = sf::Color::Black;
 	}
 
 	std::size_t GetMaxIterations()

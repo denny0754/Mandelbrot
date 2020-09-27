@@ -360,6 +360,8 @@ namespace Mandelbrot
 
 	void UseVertexBuffer(bool enable)
 	{
+		MandelbrotInternalData::UsingVertexBuffer = enable;
+
 		// Use VertexBuffer
 		if (sf::VertexBuffer::isAvailable() && enable)
 		{
@@ -374,6 +376,11 @@ namespace Mandelbrot
 			MandelbrotInternalData::ProcessFncPtrMt = std::bind(Mandelbrot::ProcessMtUsingSprite, std::placeholders::_1);
 			MandelbrotInternalData::DrawFncPtr = std::bind(Mandelbrot::DrawSprite, std::placeholders::_1);
 		}
+	}
+
+	bool IsUsingVertexBuffer()
+	{
+		return MandelbrotInternalData::UsingVertexBuffer;
 	}
 
 	void DrawMandelbrotSet(sf::RenderWindow& renderer)

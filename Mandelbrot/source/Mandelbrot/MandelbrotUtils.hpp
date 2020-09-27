@@ -36,6 +36,7 @@ namespace Mandelbrot
 	// Note: If VertexBuffer is not avaiable on the system, it won't be used
 	// even if `enable` is set to true.
 	void UseVertexBuffer(bool enable = sf::VertexBuffer::isAvailable());
+	bool IsUsingVertexBuffer();
 
 	void DrawMandelbrotSet(sf::RenderWindow& renderer);
 

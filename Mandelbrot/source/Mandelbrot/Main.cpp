@@ -24,6 +24,10 @@ struct MandelbrotGuiElements
 
 	static inline Mandelbrot::Gui::Button IterationsPlusButton = Mandelbrot::Gui::Button({ 100, 25 }, { 600, 0 }, "ITER+");
 	static inline Mandelbrot::Gui::Button IterationsMinusButton = Mandelbrot::Gui::Button({ 100, 25 }, { 700, 0 }, "ITER-");
+
+	static inline Mandelbrot::Gui::Button ToggleVertexBufferButton = Mandelbrot::Gui::Button({ 100, 25 }, { 800, 0 }, "TOGGLE VB");
+
+	static inline bool ShouldUpdateProcess = false;
 };
 
 void RendererThread(sf::RenderWindow* window)
@@ -45,6 +49,7 @@ void RendererThread(sf::RenderWindow* window)
 		window->draw(MandelbrotGuiElements::OffsetYMinusButton);
 		window->draw(MandelbrotGuiElements::IterationsPlusButton);
 		window->draw(MandelbrotGuiElements::IterationsMinusButton);
+		window->draw(MandelbrotGuiElements::ToggleVertexBufferButton);
 
 		window->display();
 	}
@@ -107,14 +112,22 @@ int main()
 			}
 		}
 
-		MandelbrotGuiElements::ZoomInButton.Update(window);
-		MandelbrotGuiElements::ZoomOutButton.Update(window);
-		MandelbrotGuiElements::OffsetXPlusButton.Update(window);
-		MandelbrotGuiElements::OffsetXMinusButton.Update(window);
-		MandelbrotGuiElements::OffsetYPlusButton.Update(window);
-		MandelbrotGuiElements::OffsetYMinusButton.Update(window);
-		MandelbrotGuiElements::IterationsPlusButton.Update(window);
-		MandelbrotGuiElements::IterationsMinusButton.Update(window);
+#pragma omp parallel for
+		{
+			MandelbrotGuiElements::ZoomInButton.Update(window);
+			MandelbrotGuiElements::ZoomOutButton.Update(window);
+
+			MandelbrotGuiElements::OffsetXPlusButton.Update(window);
+			MandelbrotGuiElements::OffsetXMinusButton.Update(window);
+
+			MandelbrotGuiElements::OffsetYPlusButton.Update(window);
+			MandelbrotGuiElements::OffsetYMinusButton.Update(window);
+
+			MandelbrotGuiElements::IterationsPlusButton.Update(window);
+			MandelbrotGuiElements::IterationsMinusButton.Update(window);
+
+			MandelbrotGuiElements::ToggleVertexBufferButton.Update(window);
+		}
 
 		// TODO Code below MUST be cleaned up. Either move button events on a function or create a `OnButtonPress` method inside the button class.
 		if (MandelbrotGuiElements::OffsetXPlusButton.GetCurrentState() == Mandelbrot::Gui::Button::ButtonState::Pressed)
@@ -126,8 +139,7 @@ int main()
 					offset.y
 				}
 			);
-			sf::Thread process_thread(&Mandelbrot::ProcessMt);
-			process_thread.launch();
+			MandelbrotGuiElements::ShouldUpdateProcess = true;
 		}
 		else if (MandelbrotGuiElements::OffsetXMinusButton.GetCurrentState() == Mandelbrot::Gui::Button::ButtonState::Pressed)
 		{
@@ -138,8 +150,7 @@ int main()
 					offset.y
 				}
 			);
-			sf::Thread process_thread(&Mandelbrot::ProcessMt);
-			process_thread.launch();
+			MandelbrotGuiElements::ShouldUpdateProcess = true;
 		}
 
 		if (MandelbrotGuiElements::OffsetYPlusButton.GetCurrentState() == Mandelbrot::Gui::Button::ButtonState::Pressed)
@@ -151,8 +162,7 @@ int main()
 					offset.y + 0.0008
 				}
 			);
-			sf::Thread process_thread(&Mandelbrot::ProcessMt);
-			process_thread.launch();
+			MandelbrotGuiElements::ShouldUpdateProcess = true;
 		}
 		else if (MandelbrotGuiElements::OffsetYMinusButton.GetCurrentState() == Mandelbrot::Gui::Button::ButtonState::Pressed)
 		{
@@ -163,40 +173,53 @@ int main()
 					offset.y - 0.0008
 				}
 			);
-			sf::Thread process_thread(&Mandelbrot::ProcessMt);
-			process_thread.launch();
+			MandelbrotGuiElements::ShouldUpdateProcess = true;
 		}
 
 		if (MandelbrotGuiElements::ZoomInButton.GetCurrentState() == Mandelbrot::Gui::Button::ButtonState::Pressed)
 		{
 			auto lzoom = Mandelbrot::GetZoom();
 			Mandelbrot::SetZoom(lzoom - 0.0004);
-			sf::Thread process_thread(&Mandelbrot::ProcessMt);
-			process_thread.launch();
+			MandelbrotGuiElements::ShouldUpdateProcess = true;
 		}
 		else if (MandelbrotGuiElements::ZoomOutButton.GetCurrentState() == Mandelbrot::Gui::Button::ButtonState::Pressed)
 		{
 			auto lzoom = Mandelbrot::GetZoom();
 			Mandelbrot::SetZoom(lzoom + 0.0004);
-			sf::Thread process_thread(&Mandelbrot::ProcessMt);
-			process_thread.launch();
+			MandelbrotGuiElements::ShouldUpdateProcess = true;
 		}
 
 		if (MandelbrotGuiElements::IterationsPlusButton.GetCurrentState() == Mandelbrot::Gui::Button::ButtonState::Pressed)
 		{
 			auto iters = Mandelbrot::GetMaxIterations();
 			Mandelbrot::SetMaxIterations(iters + 1000);
-			sf::Thread process_thread(&Mandelbrot::ProcessMt);
-			process_thread.launch();
+			MandelbrotGuiElements::ShouldUpdateProcess = true;
 		}
 		else if (MandelbrotGuiElements::IterationsMinusButton.GetCurrentState() == Mandelbrot::Gui::Button::ButtonState::Pressed)
 		{
 			auto iters = Mandelbrot::GetMaxIterations();
-			Mandelbrot::SetMaxIterations(iters - 1000);
-			sf::Thread process_thread(&Mandelbrot::ProcessMt);
-			process_thread.launch();
+			if (iters != 1000)
+			{
+				Mandelbrot::SetMaxIterations(iters - 1000);
+				MandelbrotGuiElements::ShouldUpdateProcess = true;
+			}
 		}
 
+		if (MandelbrotGuiElements::ToggleVertexBufferButton.GetCurrentState() == Mandelbrot::Gui::Button::ButtonState::Pressed)
+		{
+			bool using_vertex_buffer = Mandelbrot::IsUsingVertexBuffer();
+
+			Logger::GetLogger()->info("Vertex Buffer set to {}", using_vertex_buffer);
+			if (!using_vertex_buffer)
+			{
+				Logger::GetLogger()->warn("For a better experience, it is recommended to use VertexBuffer");
+			}
+
+			Mandelbrot::UseVertexBuffer(!Mandelbrot::IsUsingVertexBuffer());
+			MandelbrotGuiElements::ShouldUpdateProcess = true;
+		}
+
+		// This will reset Mandelbrot data to default values.
 		if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::R))
 		{
 			Mandelbrot::SetZoom(zoom);
@@ -204,8 +227,22 @@ int main()
 			Mandelbrot::UseVertexBuffer(false);
 			Mandelbrot::SetMaxIterations(1000u);
 			Mandelbrot::SetMaxThreads(8);
+			MandelbrotGuiElements::ShouldUpdateProcess = true;
+		}
+
+		if (MandelbrotGuiElements::ShouldUpdateProcess)
+		{
+			Logger::GetLogger()->info("Current Settings:");
+			Logger::GetLogger()->info("\tOffsetX: {:<10}", Mandelbrot::GetOffset().x);
+			Logger::GetLogger()->info("\tOffsetY: {:<10}", Mandelbrot::GetOffset().y);
+			Logger::GetLogger()->info("\tZoom: {:<10}", Mandelbrot::GetZoom());
+			Logger::GetLogger()->info("\tMax Iterations: {:<10}", Mandelbrot::GetMaxIterations());
+			Logger::GetLogger()->info("\tThreads: {:<10}", Mandelbrot::GetMaxThreads());
+
+
 			sf::Thread process_thread(&Mandelbrot::ProcessMt);
 			process_thread.launch();
+			MandelbrotGuiElements::ShouldUpdateProcess = false;
 		}
 	}
 

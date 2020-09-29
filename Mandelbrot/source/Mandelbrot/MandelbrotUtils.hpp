@@ -25,6 +25,8 @@ namespace Mandelbrot
 
 	void SetMaxIterations(std::size_t iter);
 	std::size_t GetMaxIterations();
+	void SetDefaultMaxIterations(std::size_t iter);
+	std::size_t GetDefaultMaxIterations();
 
 	sf::Color GetPointColor(std::size_t iter);
 
@@ -42,9 +44,13 @@ namespace Mandelbrot
 
 	void SetZoom(const double& zoom);
 	double GetZoom();
+	void SetDefaultZoom(double zoom);
+	double GetDefaultZoom();
 
 	void SetOffset(const sf::Vector2d& offset);
 	sf::Vector2d GetOffset();
+	void SetDefaultOffset(const sf::Vector2d& offset);
+	sf::Vector2d GetDefaultOffset();
 
 	// Updates the plane(vertex buffer or sprite) only if something has changed.
 	void Update();

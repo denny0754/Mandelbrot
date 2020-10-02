@@ -14,9 +14,9 @@ namespace Mandelbrot
 {
 	struct MandelbrotPlaneData
 	{
-		double Zoom;
-		double OffsetX;
-		double OffsetY;
+		long double Zoom;
+		long double OffsetX;
+		long double OffsetY;
 	};
 
 	struct MandelbrotProcessData
@@ -88,7 +88,7 @@ namespace Mandelbrot
 	void ProcessMtUsingSprite(const MandelbrotProcessData& data);
 
 	// Returns the true x-y coordinates of the Set.
-	sf::Vector2d ScaleToPlane(const sf::Vector2d& coords, const MandelbrotPlaneData& data);
+	sf::Vector2ld ScaleToPlane(const sf::Vector2ld& coords, const MandelbrotPlaneData& data);
 
 	// Initializes the Mandelbrot set
 	void Init()
@@ -141,8 +141,8 @@ namespace Mandelbrot
 				std::size_t j = (y * Config::WINDOW_WIDTH) + x;
 
 				// Scaling x and y coordinates to real/imaginary coords.
-				sf::Vector2d plane_coords = ScaleToPlane(
-					{ static_cast<double>(x), static_cast<double>(y) },
+				sf::Vector2ld plane_coords = ScaleToPlane(
+					{ static_cast<long double>(x), static_cast<long double>(y) },
 					MandelbrotInternalData::PlaneData
 				);
 				MandelbrotInternalData::MdSprite.MdImage.setPixel(
@@ -166,8 +166,8 @@ namespace Mandelbrot
 				std::size_t j = (y * Config::WINDOW_WIDTH) + x;
 
 				// Scaling x and y coordinates to real/imaginary coords.
-				sf::Vector2d plane_coords = ScaleToPlane(
-					{ static_cast<double>(x), static_cast<double>(y) },
+				sf::Vector2ld plane_coords = ScaleToPlane(
+					{ static_cast<long double>(x), static_cast<long double>(y) },
 					MandelbrotInternalData::PlaneData
 				);
 
@@ -192,8 +192,8 @@ namespace Mandelbrot
 			for (std::size_t x = data.MinX; x < data.MaxX; x++)
 			{
 				std::size_t j = (y * Config::WINDOW_WIDTH) + x;
-				sf::Vector2d plane_coords = ScaleToPlane(
-					{ static_cast<double>(x), static_cast<double>(y) },
+				sf::Vector2ld plane_coords = ScaleToPlane(
+					{ static_cast<long double>(x), static_cast<long double>(y) },
 					data.Data
 				);
 
@@ -205,6 +205,7 @@ namespace Mandelbrot
 
 		// Should we use `std::lock_guard<std::mutex> mutex`?
 		//std::lock_guard<std::mutex> mutex(MandelbrotInternalData::Mutex);
+		// TODO Right now we're updating the entire buffer. We should, instead, update only a portion of it. We should create an array of vertices with a size that depends on the current work and update only that portion of vertices. This should result in a little gain of performance if done right.
 		MandelbrotInternalData::MdVertexBuffer.MandelbrotBuffer.update(MandelbrotInternalData::MdVertexBuffer.MandelbrotVertices);
 	}
 
@@ -217,8 +218,8 @@ namespace Mandelbrot
 				std::size_t j = (y * Config::WINDOW_WIDTH) + x;
 
 				// Scaling x and y coordinates to real/imaginary coords.
-				sf::Vector2d plane_coords = ScaleToPlane(
-					{ static_cast<double>(x), static_cast<double>(y) },
+				sf::Vector2ld plane_coords = ScaleToPlane(
+					{ static_cast<long double>(x), static_cast<long double>(y) },
 					data.Data
 				);
 				// Should we use `std::lock_guard<std::mutex> mutex`?
@@ -280,23 +281,32 @@ namespace Mandelbrot
 		}
 	}
 
-	sf::Vector2d ScaleToPlane(const sf::Vector2d& coords, const MandelbrotPlaneData& data)
+	// Returns the true x-y coordinates of the Set.
+	sf::Vector2ld ScaleToPlane(const sf::Vector2ld& coords)
 	{
-		sf::Vector2d plane_coords;
+		sf::Vector2ld plane_coords;
+		plane_coords.x = (coords.x - Mandelbrot::Config::WINDOW_WIDTH / 2.0) * GetZoom() + GetOffset().x;
+		plane_coords.y = (coords.y - Mandelbrot::Config::WINDOW_HEIGHT / 2.0) * GetZoom() + GetOffset().y;
+		return plane_coords;
+	}
+
+	sf::Vector2ld ScaleToPlane(const sf::Vector2ld& coords, const MandelbrotPlaneData& data)
+	{
+		sf::Vector2ld plane_coords;
 		plane_coords.x = (coords.x - Mandelbrot::Config::WINDOW_WIDTH / 2.0) * data.Zoom + data.OffsetX;
 		plane_coords.y = (coords.y - Mandelbrot::Config::WINDOW_HEIGHT / 2.0) * data.Zoom + data.OffsetY;
 		return plane_coords;
 	}
 
-	std::size_t GetPointIterations(const sf::Vector2d& plane_coords)
+	std::size_t GetPointIterations(const sf::Vector2ld& plane_coords)
 	{
-		double zReal = plane_coords.x;
-		double zImag = plane_coords.y;
+		long double zReal = plane_coords.x;
+		long double zImag = plane_coords.y;
 
 #pragma omp parallel for
 		for (std::size_t iter = 0; iter < MandelbrotInternalData::MaxIterations; iter++) {
-			double r2 = zReal * zReal;
-			double i2 = zImag * zImag;
+			long double r2 = zReal * zReal;
+			long double i2 = zImag * zImag;
 			if (r2 + i2 > 4.0)
 			{
 				return iter;
@@ -429,7 +439,7 @@ namespace Mandelbrot
 		renderer.draw(MandelbrotInternalData::MdSprite.MdSprite);
 	}
 
-	void SetZoom(const double& zoom)
+	void SetZoom(const long double& zoom)
 	{
 		MandelbrotInternalData::PreviousPlaneData.Zoom = MandelbrotInternalData::PlaneData.Zoom;
 
@@ -438,22 +448,22 @@ namespace Mandelbrot
 		MandelbrotInternalData::PlaneData.Zoom = zoom;
 	}
 
-	double GetZoom()
+	long double GetZoom()
 	{
 		return MandelbrotInternalData::PlaneData.Zoom;
 	}
 
-	void SetDefaultZoom(double zoom)
+	void SetDefaultZoom(long double zoom)
 	{
 		MandelbrotInternalData::DefaultPlaneData.Zoom = zoom;
 	}
 
-	double GetDefaultZoom()
+	long double GetDefaultZoom()
 	{
 		return MandelbrotInternalData::DefaultPlaneData.Zoom;
 	}
 
-	void SetOffset(const sf::Vector2d& offset)
+	void SetOffset(const sf::Vector2ld& offset)
 	{
 		MandelbrotInternalData::PreviousPlaneData.OffsetX = MandelbrotInternalData::PlaneData.OffsetX;
 		MandelbrotInternalData::PreviousPlaneData.OffsetY = MandelbrotInternalData::PlaneData.OffsetY;
@@ -464,7 +474,7 @@ namespace Mandelbrot
 		MandelbrotInternalData::PlaneData.OffsetY = offset.y;
 	}
 
-	sf::Vector2d GetOffset()
+	sf::Vector2ld GetOffset()
 	{
 		return {
 			MandelbrotInternalData::PlaneData.OffsetX,
@@ -472,13 +482,13 @@ namespace Mandelbrot
 		};
 	}
 
-	void SetDefaultOffset(const sf::Vector2d& offset)
+	void SetDefaultOffset(const sf::Vector2ld& offset)
 	{
 		MandelbrotInternalData::DefaultPlaneData.OffsetX = offset.x;
 		MandelbrotInternalData::DefaultPlaneData.OffsetY = offset.y;
 	}
 
-	sf::Vector2d GetDefaultOffset()
+	sf::Vector2ld GetDefaultOffset()
 	{
 		return {
 			MandelbrotInternalData::DefaultPlaneData.OffsetX,

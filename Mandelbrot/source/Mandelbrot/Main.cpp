@@ -26,19 +26,27 @@ void RendererThread(sf::RenderWindow* window)
 int main()
 {
 	Logger::Init("MANDELBROT");
+	Logger::GetLogger()->trace("Size of `double`: {}", sizeof(double));
+	Logger::GetLogger()->trace("Size of `long double`: {}", sizeof(long double));
 
 	Mandelbrot::Init();
 	Mandelbrot::Gui::InitGui();
 	// -0.6140625273462111 + -0.40633146872742876i at zoom 3.9041710026e+06 => Nice Zoom
 
-	double zoom = 0.004;
-	double offsetX = -0.7;
-	double offsetY = 0.0;
+	long double zoom = 0.004;
+	long double offsetX = -0.7;
+	long double offsetY = 0.0;
 	Mandelbrot::SetZoom(zoom);
 	Mandelbrot::SetOffset({ offsetX, offsetY });
 	Mandelbrot::UseVertexBuffer(false);
 	Mandelbrot::SetMaxIterations(1000u);
 	Mandelbrot::SetMaxThreads(8);
+
+	Mandelbrot::SetDefaultZoom(zoom);
+	Mandelbrot::SetDefaultOffset({ offsetX, offsetY });
+	Mandelbrot::SetDefaultMaxIterations(1000u);
+
+	
 
 	Timer timer;
 	timer.start();
@@ -76,6 +84,15 @@ int main()
 		}
 		// Updating the Mandelbrot GUI 
 		Mandelbrot::Gui::UpdateGui(window);
+
+		if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left) && sf::Keyboard::isKeyPressed(sf::Keyboard::LControl))
+		{
+			auto pos = sf::Mouse::getPosition();
+
+			auto offset = Mandelbrot::ScaleToPlane({ static_cast<long double>(pos.x), static_cast<long double>(pos.y) });
+			Mandelbrot::SetOffset(offset);
+			Mandelbrot::Update();
+		}
 	}
 
 	return 0;

@@ -113,13 +113,13 @@ namespace Mandelbrot
 			if (MandelbrotGuiInternalData::ZoomInButton.GetCurrentState() == Mandelbrot::Gui::Button::ButtonState::Pressed)
 			{
 				auto lzoom = Mandelbrot::GetZoom();
-				Mandelbrot::SetZoom(lzoom - 0.0004);
+				Mandelbrot::SetZoom(lzoom * 0.7);
 				MandelbrotGuiInternalData::ShouldUpdateProcess = true;
 			}
 			else if (MandelbrotGuiInternalData::ZoomOutButton.GetCurrentState() == Mandelbrot::Gui::Button::ButtonState::Pressed)
 			{
 				auto lzoom = Mandelbrot::GetZoom();
-				Mandelbrot::SetZoom(lzoom + 0.0004);
+				Mandelbrot::SetZoom(lzoom * 7);
 				MandelbrotGuiInternalData::ShouldUpdateProcess = true;
 			}
 

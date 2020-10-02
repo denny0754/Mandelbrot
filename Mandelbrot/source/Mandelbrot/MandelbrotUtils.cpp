@@ -14,9 +14,9 @@ namespace Mandelbrot
 {
 	struct MandelbrotPlaneData
 	{
-		double Zoom;
-		double OffsetX;
-		double OffsetY;
+		long double Zoom;
+		long double OffsetX;
+		long double OffsetY;
 	};
 
 	struct MandelbrotProcessData
@@ -31,10 +31,11 @@ namespace Mandelbrot
 	struct MandelbrotInternalData
 	{
 		static constexpr std::size_t MandelbrotArraySize = static_cast<std::size_t>(Config::WINDOW_WIDTH) * static_cast<std::size_t>(Config::WINDOW_HEIGHT);
-		
+
 		static inline std::size_t ThreadCounter = std::thread::hardware_concurrency();
-		
+
 		static inline std::size_t MaxIterations = 1000;
+		static inline std::size_t DefaultMaxIterations = MaxIterations;
 
 		struct MandelbrotVertexBuffer
 		{
@@ -67,7 +68,11 @@ namespace Mandelbrot
 		// Data of the plane. See `MandelbrotData`.
 		static inline MandelbrotPlaneData PlaneData = MandelbrotPlaneData();
 		static inline MandelbrotPlaneData PreviousPlaneData = MandelbrotPlaneData();
+		static inline MandelbrotPlaneData DefaultPlaneData = MandelbrotPlaneData();
+
 		static inline bool StateChanged = false;
+
+		static inline std::unordered_map<std::size_t, sf::Color> MandelbrotSetColors = {};
 
 		// Mutex used on Multi-threaded functions
 		static inline std::mutex Mutex = std::mutex();
@@ -83,7 +88,7 @@ namespace Mandelbrot
 	void ProcessMtUsingSprite(const MandelbrotProcessData& data);
 
 	// Returns the true x-y coordinates of the Set.
-	sf::Vector2d ScaleToPlane(const sf::Vector2d& coords, const MandelbrotPlaneData& data);
+	sf::Vector2ld ScaleToPlane(const sf::Vector2ld& coords, const MandelbrotPlaneData& data);
 
 	// Initializes the Mandelbrot set
 	void Init()
@@ -119,6 +124,12 @@ namespace Mandelbrot
 
 		Logger::GetLogger()->info("Mandelbrot Set Data Initialized.");
 		Logger::GetLogger()->info("\t=> Available Threads: {}", MandelbrotInternalData::ThreadCounter);
+
+		for (std::size_t iter = 0; iter < 128; iter++)
+		{
+			MandelbrotInternalData::MandelbrotSetColors[iter] = GetPointColor(iter);
+		}
+		MandelbrotInternalData::MandelbrotSetColors[MandelbrotInternalData::MaxIterations] = sf::Color::Black;
 	}
 
 	void ProcessStUsingSprite(const MandelbrotProcessData& data)
@@ -130,8 +141,8 @@ namespace Mandelbrot
 				std::size_t j = (y * Config::WINDOW_WIDTH) + x;
 
 				// Scaling x and y coordinates to real/imaginary coords.
-				sf::Vector2d plane_coords = ScaleToPlane(
-					{ static_cast<double>(x), static_cast<double>(y) },
+				sf::Vector2ld plane_coords = ScaleToPlane(
+					{ static_cast<long double>(x), static_cast<long double>(y) },
 					MandelbrotInternalData::PlaneData
 				);
 				MandelbrotInternalData::MdSprite.MdImage.setPixel(
@@ -155,12 +166,12 @@ namespace Mandelbrot
 				std::size_t j = (y * Config::WINDOW_WIDTH) + x;
 
 				// Scaling x and y coordinates to real/imaginary coords.
-				sf::Vector2d plane_coords = ScaleToPlane(
-					{ static_cast<double>(x), static_cast<double>(y) },
+				sf::Vector2ld plane_coords = ScaleToPlane(
+					{ static_cast<long double>(x), static_cast<long double>(y) },
 					MandelbrotInternalData::PlaneData
 				);
 
-				MandelbrotInternalData::MdVertexBuffer.MandelbrotVertices[j].color = GetPointColor(GetPointIterations(plane_coords));
+				MandelbrotInternalData::MdVertexBuffer.MandelbrotVertices[j].color = MandelbrotInternalData::MandelbrotSetColors.at(GetPointIterations(plane_coords));
 			}
 		}
 		MandelbrotInternalData::MdVertexBuffer.MandelbrotBuffer.update(MandelbrotInternalData::MdVertexBuffer.MandelbrotVertices);
@@ -181,8 +192,8 @@ namespace Mandelbrot
 			for (std::size_t x = data.MinX; x < data.MaxX; x++)
 			{
 				std::size_t j = (y * Config::WINDOW_WIDTH) + x;
-				sf::Vector2d plane_coords = ScaleToPlane(
-					{ static_cast<double>(x), static_cast<double>(y) },
+				sf::Vector2ld plane_coords = ScaleToPlane(
+					{ static_cast<long double>(x), static_cast<long double>(y) },
 					data.Data
 				);
 
@@ -194,6 +205,7 @@ namespace Mandelbrot
 
 		// Should we use `std::lock_guard<std::mutex> mutex`?
 		//std::lock_guard<std::mutex> mutex(MandelbrotInternalData::Mutex);
+		// TODO Right now we're updating the entire buffer. We should, instead, update only a portion of it. We should create an array of vertices with a size that depends on the current work and update only that portion of vertices. This should result in a little gain of performance if done right.
 		MandelbrotInternalData::MdVertexBuffer.MandelbrotBuffer.update(MandelbrotInternalData::MdVertexBuffer.MandelbrotVertices);
 	}
 
@@ -206,8 +218,8 @@ namespace Mandelbrot
 				std::size_t j = (y * Config::WINDOW_WIDTH) + x;
 
 				// Scaling x and y coordinates to real/imaginary coords.
-				sf::Vector2d plane_coords = ScaleToPlane(
-					{ static_cast<double>(x), static_cast<double>(y) },
+				sf::Vector2ld plane_coords = ScaleToPlane(
+					{ static_cast<long double>(x), static_cast<long double>(y) },
 					data.Data
 				);
 				// Should we use `std::lock_guard<std::mutex> mutex`?
@@ -249,7 +261,7 @@ namespace Mandelbrot
 				//Logger::GetLogger()->trace("TID=[{}] - min_x={} - max_x={} - min_y={} - max_y={}", tid, data.MinX, data.MaxX, data.MinY, data.MaxY);
 
 				// Pushing the new thread to the vector
-				threads.push_back( std::thread( MandelbrotInternalData::ProcessFncPtrMt, data) );
+				threads.push_back(std::thread(MandelbrotInternalData::ProcessFncPtrMt, data));
 				// Updating the workload of the next thread.
 				min_x = max_x;
 				max_x += work_on_x_axis;
@@ -268,24 +280,33 @@ namespace Mandelbrot
 			t.join();
 		}
 	}
-	
-	sf::Vector2d ScaleToPlane(const sf::Vector2d& coords, const MandelbrotPlaneData& data)
+
+	// Returns the true x-y coordinates of the Set.
+	sf::Vector2ld ScaleToPlane(const sf::Vector2ld& coords)
 	{
-		sf::Vector2d plane_coords;
+		sf::Vector2ld plane_coords;
+		plane_coords.x = (coords.x - Mandelbrot::Config::WINDOW_WIDTH / 2.0) * GetZoom() + GetOffset().x;
+		plane_coords.y = (coords.y - Mandelbrot::Config::WINDOW_HEIGHT / 2.0) * GetZoom() + GetOffset().y;
+		return plane_coords;
+	}
+
+	sf::Vector2ld ScaleToPlane(const sf::Vector2ld& coords, const MandelbrotPlaneData& data)
+	{
+		sf::Vector2ld plane_coords;
 		plane_coords.x = (coords.x - Mandelbrot::Config::WINDOW_WIDTH / 2.0) * data.Zoom + data.OffsetX;
 		plane_coords.y = (coords.y - Mandelbrot::Config::WINDOW_HEIGHT / 2.0) * data.Zoom + data.OffsetY;
 		return plane_coords;
 	}
 
-	std::size_t GetPointIterations(const sf::Vector2d& plane_coords)
+	std::size_t GetPointIterations(const sf::Vector2ld& plane_coords)
 	{
-		double zReal = plane_coords.x;
-		double zImag = plane_coords.y;
+		long double zReal = plane_coords.x;
+		long double zImag = plane_coords.y;
 
-		#pragma omp parallel for
+#pragma omp parallel for
 		for (std::size_t iter = 0; iter < MandelbrotInternalData::MaxIterations; iter++) {
-			double r2 = zReal * zReal;
-			double i2 = zImag * zImag;
+			long double r2 = zReal * zReal;
+			long double i2 = zImag * zImag;
 			if (r2 + i2 > 4.0)
 			{
 				return iter;
@@ -299,11 +320,25 @@ namespace Mandelbrot
 	void SetMaxIterations(std::size_t iter)
 	{
 		MandelbrotInternalData::MaxIterations = iter;
+		MandelbrotInternalData::MandelbrotSetColors[MandelbrotInternalData::MaxIterations] = sf::Color::Black;
 	}
 
 	std::size_t GetMaxIterations()
 	{
 		return MandelbrotInternalData::MaxIterations;
+	}
+
+	void SetDefaultMaxIterations(std::size_t iter)
+	{
+		if (iter > 0)
+		{
+			MandelbrotInternalData::DefaultMaxIterations = iter;
+		}
+	}
+
+	std::size_t GetDefaultMaxIterations()
+	{
+		return MandelbrotInternalData::DefaultMaxIterations;
 	}
 
 	sf::Color GetPointColor(std::size_t iterations)
@@ -404,7 +439,7 @@ namespace Mandelbrot
 		renderer.draw(MandelbrotInternalData::MdSprite.MdSprite);
 	}
 
-	void SetZoom(const double& zoom)
+	void SetZoom(const long double& zoom)
 	{
 		MandelbrotInternalData::PreviousPlaneData.Zoom = MandelbrotInternalData::PlaneData.Zoom;
 
@@ -413,12 +448,22 @@ namespace Mandelbrot
 		MandelbrotInternalData::PlaneData.Zoom = zoom;
 	}
 
-	double GetZoom()
+	long double GetZoom()
 	{
 		return MandelbrotInternalData::PlaneData.Zoom;
 	}
 
-	void SetOffset(const sf::Vector2d& offset)
+	void SetDefaultZoom(long double zoom)
+	{
+		MandelbrotInternalData::DefaultPlaneData.Zoom = zoom;
+	}
+
+	long double GetDefaultZoom()
+	{
+		return MandelbrotInternalData::DefaultPlaneData.Zoom;
+	}
+
+	void SetOffset(const sf::Vector2ld& offset)
 	{
 		MandelbrotInternalData::PreviousPlaneData.OffsetX = MandelbrotInternalData::PlaneData.OffsetX;
 		MandelbrotInternalData::PreviousPlaneData.OffsetY = MandelbrotInternalData::PlaneData.OffsetY;
@@ -429,11 +474,25 @@ namespace Mandelbrot
 		MandelbrotInternalData::PlaneData.OffsetY = offset.y;
 	}
 
-	sf::Vector2d GetOffset()
+	sf::Vector2ld GetOffset()
 	{
 		return {
 			MandelbrotInternalData::PlaneData.OffsetX,
 			MandelbrotInternalData::PlaneData.OffsetY
+		};
+	}
+
+	void SetDefaultOffset(const sf::Vector2ld& offset)
+	{
+		MandelbrotInternalData::DefaultPlaneData.OffsetX = offset.x;
+		MandelbrotInternalData::DefaultPlaneData.OffsetY = offset.y;
+	}
+
+	sf::Vector2ld GetDefaultOffset()
+	{
+		return {
+			MandelbrotInternalData::DefaultPlaneData.OffsetX,
+			MandelbrotInternalData::DefaultPlaneData.OffsetY
 		};
 	}
 
@@ -453,66 +512,3 @@ namespace Mandelbrot
 	}
 
 }
-
-
-//void process(sf::Vector2f from, sf::Vector2f to)
-//{
-//	float width = 1280;
-//	float height = 720;
-//
-//	float x_step = (to.x - from.x) / width;
-//	float y_step = (to.y - from.y) / height;
-//
-//#pragma omp parallel for
-//	for (size_t py = 0; py < height; py++) {
-//		float y0 = from.y + y_step * py;
-//
-//		for (size_t px = 0; px < width / 8 * 8; px += 8) {
-//			float pxf = (float)px;
-//			__m256 pxs_deltas128 = _mm256_mul_ps(_mm256_set_ps(0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f), _mm256_set1_ps(x_step));
-//			__m256 xs0 = _mm256_add_ps(_mm256_set1_ps(from.x), _mm256_add_ps(_mm256_set1_ps(x_step * pxf), pxs_deltas128));    // from.x() + x_step * px
-//
-//			unsigned short iteration;
-//			__m256i maskAll = _mm256_setzero_si256();
-//			__m256i iters = _mm256_setzero_si256();
-//			__m256 xs = _mm256_set1_ps(0.0f);
-//			__m256 ys = _mm256_set1_ps(0.0f);
-//			for (iteration = 0; iteration < Mandelbrot::MandelbrotInternalData::MaxIterations; iteration++) {
-//				__m256 xsn = _mm256_add_ps(_mm256_sub_ps(_mm256_mul_ps(xs, xs), _mm256_mul_ps(ys, ys)), xs0);               // xn = x * x - y * y + x0;
-//				__m256 ysn = _mm256_add_ps(_mm256_mul_ps(_mm256_mul_ps(_mm256_set1_ps(2.0f), xs), ys), _mm256_set1_ps(y0)); // yn = 2 * x * y + y0;
-//				xs = _mm256_add_ps(_mm256_andnot_ps((__m256) maskAll, xsn), _mm256_and_ps((__m256) maskAll, xs));
-//				ys = _mm256_add_ps(_mm256_andnot_ps((__m256) maskAll, ysn), _mm256_and_ps((__m256) maskAll, ys));
-//
-//				maskAll = (__m256i) _mm256_or_ps(_mm256_cmp_ps(_mm256_add_ps(_mm256_mul_ps(xs, xs), _mm256_mul_ps(ys, ys)), _mm256_set1_ps(INFINITY), _CMP_GT_OS), (__m256) maskAll);
-//				iters = _mm256_add_epi16(iters, _mm256_andnot_si256(maskAll, _mm256_set1_epi16(1)));
-//				int mask = _mm256_movemask_epi8(maskAll);
-//				if (mask == (int)0xffffffff) {
-//					break;
-//				}
-//			}
-//			iters = _mm256_shuffle_epi8(iters, _mm256_setr_epi8(0, 1, -1, -1, 4, 5, -1, -1, 8, 9, -1, -1, 12, 13, -1, -1, 16, 17, -1, -1, 20, 21, -1, -1, 24, 25, -1, -1, 28, 29, -1, -1));
-//			unsigned int tmp[8];
-//			_mm256_storeu_si256((__m256i*) tmp, iters);
-//			for (int i = 0; i < 8; i++) {
-//				iterations(py, px + 7 - i) = (unsigned short)tmp[i];
-//			}
-//		}
-//
-//		for (size_t px = iterations.width / 8 * 8; px < iterations.width; px++) {
-//			float x0 = from.x() + (to.x() - from.x()) * px / width;
-//
-//			unsigned short iteration;
-//			float x = 0.0f;
-//			float y = 0.0f;
-//			for (iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-//				float xn = x * x - y * y + x0;
-//				y = 2 * x * y + y0;
-//				x = xn;
-//				if (x * x + y * y > INFINITY) {
-//					break;
-//				}
-//			}
-//			iterations(py, px) = iteration;
-//		}
-//	}
-//}

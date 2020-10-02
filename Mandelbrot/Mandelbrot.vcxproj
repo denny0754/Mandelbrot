@@ -146,6 +146,8 @@
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
       <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
       <TreatWarningAsError>true</TreatWarningAsError>
+      <FloatingPointModel>Precise</FloatingPointModel>
+      <InlineFunctionExpansion>Default</InlineFunctionExpansion>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -157,6 +159,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="source\Mandelbrot\Main.cpp" />
+    <ClCompile Include="source\Mandelbrot\MandelbrotGui.cpp" />
     <ClCompile Include="source\Mandelbrot\MandelbrotUtils.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -164,6 +167,7 @@
     <ClInclude Include="source\Mandelbrot\Config.hpp" />
     <ClInclude Include="source\Mandelbrot\Logger.hpp" />
     <ClInclude Include="source\Mandelbrot\MandebrotPoint.hpp" />
+    <ClInclude Include="source\Mandelbrot\MandelbrotGui.hpp" />
     <ClInclude Include="source\Mandelbrot\MandelbrotUtils.hpp" />
     <ClInclude Include="source\Mandelbrot\Timer.hpp" />
   </ItemGroup>

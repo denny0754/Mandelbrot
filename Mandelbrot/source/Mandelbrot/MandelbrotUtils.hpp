@@ -7,7 +7,7 @@
 
 namespace sf
 {
-	typedef Vector2<double>  Vector2d;
+	typedef Vector2<long double>  Vector2ld;
 }
 
 namespace Mandelbrot
@@ -21,10 +21,15 @@ namespace Mandelbrot
 	// Process Mandelbrot points in Multi-threaded Mode
 	void ProcessMt();
 
-	std::size_t GetPointIterations(const sf::Vector2d& plane_coords);
+	std::size_t GetPointIterations(const sf::Vector2ld& plane_coords);
+
+	// Returns the true x-y coordinates of the Set.
+	sf::Vector2ld ScaleToPlane(const sf::Vector2ld& coords);
 
 	void SetMaxIterations(std::size_t iter);
 	std::size_t GetMaxIterations();
+	void SetDefaultMaxIterations(std::size_t iter);
+	std::size_t GetDefaultMaxIterations();
 
 	sf::Color GetPointColor(std::size_t iter);
 
@@ -40,11 +45,15 @@ namespace Mandelbrot
 
 	void DrawMandelbrotSet(sf::RenderWindow& renderer);
 
-	void SetZoom(const double& zoom);
-	double GetZoom();
+	void SetZoom(const long double& zoom);
+	long double GetZoom();
+	void SetDefaultZoom(long double zoom);
+	long double GetDefaultZoom();
 
-	void SetOffset(const sf::Vector2d& offset);
-	sf::Vector2d GetOffset();
+	void SetOffset(const sf::Vector2ld& offset);
+	sf::Vector2ld GetOffset();
+	void SetDefaultOffset(const sf::Vector2ld& offset);
+	sf::Vector2ld GetDefaultOffset();
 
 	// Updates the plane(vertex buffer or sprite) only if something has changed.
 	void Update();

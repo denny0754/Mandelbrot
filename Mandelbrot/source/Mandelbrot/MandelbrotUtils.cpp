@@ -187,26 +187,30 @@ namespace Mandelbrot
 
 	void ProcessMtUsingVertexBuffer(const MandelbrotProcessData& data)
 	{
+		std::size_t min_off = (data.MinY * Config::WINDOW_WIDTH) + data.MinX;
+		std::size_t max_off = (data.MaxY * Config::WINDOW_WIDTH) + data.MaxX;
+		std::size_t vert_sz = max_off - min_off;
+
+		std::vector<sf::Vertex> vert_buffer;
+		vert_buffer.resize(vert_sz);
+
+		std::size_t off = 0;
+
 		for (std::size_t y = data.MinY; y < data.MaxY; y++)
 		{
 			for (std::size_t x = data.MinX; x < data.MaxX; x++)
 			{
-				std::size_t j = (y * Config::WINDOW_WIDTH) + x;
 				sf::Vector2ld plane_coords = ScaleToPlane(
 					{ static_cast<long double>(x), static_cast<long double>(y) },
 					data.Data
 				);
 
-				// Should we use `std::lock_guard<std::mutex> mutex`?
-				//std::lock_guard<std::mutex> mutex(MandelbrotInternalData::Mutex);
-				MandelbrotInternalData::MdVertexBuffer.MandelbrotVertices[j].color = GetPointColor(GetPointIterations(plane_coords));
+				vert_buffer[off].color = GetPointColor(GetPointIterations(plane_coords));
+				vert_buffer[off].position = { static_cast<float>(x), static_cast<float>(y) };
+				off++;
 			}
 		}
-
-		// Should we use `std::lock_guard<std::mutex> mutex`?
-		//std::lock_guard<std::mutex> mutex(MandelbrotInternalData::Mutex);
-		// TODO Right now we're updating the entire buffer. We should, instead, update only a portion of it. We should create an array of vertices with a size that depends on the current work and update only that portion of vertices. This should result in a little gain of performance if done right.
-		MandelbrotInternalData::MdVertexBuffer.MandelbrotBuffer.update(MandelbrotInternalData::MdVertexBuffer.MandelbrotVertices);
+		MandelbrotInternalData::MdVertexBuffer.MandelbrotBuffer.update(vert_buffer.data(), vert_sz, static_cast<unsigned int>(min_off));
 	}
 
 	void ProcessMtUsingSprite(const MandelbrotProcessData& data)
